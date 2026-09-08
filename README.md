@@ -12,10 +12,8 @@
 | `Group050_text_functions.py` | 当前整合的共享文本函数 |
 | `Group050_source_to_target_mapping.csv` | Source-to-target mapping |
 | `outputs/` | 六张标准化 CSV |
-| `Group050_EDA_revised_with_page_numbers.docx` | 当前 Word 报告版本 |
 | `Group050_EDA_context_assurance_limitations_conclusion.md` | 报告相关段落 |
 | `group_member_solution/` | 组员贡献版本，供对照与协作 |
-| `Group050_text_functions_lucy_modified.py` | 保留的组员函数版本；主 notebook 导入的是 `Group050_text_functions.py` |
 
 组员贡献版本不是另一套最终入口。需要更新整合版本时，请先检查差异，避免覆盖其他成员的修改。
 

@@ -25,18 +25,8 @@ _LITERAL_NAN = "NaN"
 # The code itself is ASCII-only, while the surrounding ``\w`` checks remain
 # Unicode-aware. Including hyphens in both boundaries rejects malformed
 # extensions instead of accepting a valid prefix from a longer token.
-_ORDER_REFERENCE_RE = re.compile(
-    r"(?<![\w-])(?ai:(?:HORD|CORD)[0-9]{6})(?![\w-])"
-)
-# Task 3, Step 2 (Xingao): SKU- needs at least one ASCII letter/digit.
-# Scoped (?ai:...) accepts lower-case input without allowing Unicode letters
-# inside the code. Unicode-aware outer boundaries reject embedded codes such
-# as 'pre_SKU-A12' and malformed continuations such as 'SKU-A12-extra'.
+_ORDER_REFERENCE_RE = re.compile(r"(?<![\w-])(?ai:(?:HORD|CORD)[0-9]{6})(?![\w-])")
 _PRODUCT_SKU_RE = re.compile(r"(?<![\w-])(?ai:SKU-[A-Z0-9]+)(?![\w-])")
-
-# Task 3, Step 2 (Xingao): only B1SAVE- through B5SAVE- plus exactly two
-# ASCII digits are valid. The right boundary prevents B3SAVE-200 from being
-# truncated to B3SAVE-20; the suffix is a format rule, not a discount lookup.
 _PROMO_CODE_RE = re.compile(r"(?<![\w-])(?ai:B[1-5]SAVE-[0-9]{2})(?![\w-])")
 
 _EMOJI_RE = re.compile(
@@ -48,35 +38,31 @@ _EMOJI_RE = re.compile(
 
 
 def _extract_upper(value, pattern):
-    """Search raw narrative with one compiled pattern and return a string.
+    """Return the first bounded match in upper case, or literal ``NaN``."""
 
-    Shared by all three extractors: return the first valid bounded match in
-    upper case, or literal ``NaN`` for missing/unmatched input. This helper
-    does not clean the input, validate relational keys, or look up source rows.
-    """
-
-    # Do not stringify None or other non-text inputs into apparent narrative.
     if not isinstance(value, str):
         return _LITERAL_NAN
 
-    # search() finds an embedded reference anywhere in the narrative; the
-    # pattern's boundaries still prevent a match inside a larger token.
     match = pattern.search(value)
-    # Keep the published string sentinel, not None, float NaN or an empty string.
     return match.group(0).upper() if match else _LITERAL_NAN
 
 
 def clean_narrative_text(value):
     """Accept None or a string; return cleaned text or the string 'NaN'."""
-
+    # check for non-string input and the literal NaN string
     if not isinstance(value, str):
         return _LITERAL_NAN
     if value == _LITERAL_NAN:
         return _LITERAL_NAN
+    # start cleaning the text in step order, as specified in the assignment instructions
 
+    # step 3: convert HTML entities to Unicode
     text = html.unescape(value)
+    # step 3:normalize to NFC
     text = unicodedata.normalize("NFC", text)
+    # step 4: remove HTML tags
     text = re.sub(r"<[^<>]*>", " ", text)
+    # step 5: remove system, catalogue, verified-purchase, source, and rating mentions
     text = re.sub(
         (
             r"\[(?:SYSTEM|CATALOGUE|VERIFIED_PURCHASE|"
@@ -86,12 +72,14 @@ def clean_narrative_text(value):
         text,
         flags=re.IGNORECASE,
     )
+    # step 5: remove verified-buyer and store-support mentions
     text = re.sub(
         r"(?<![\w-])(?:#verified-buyer|@store_support)(?![\w-])",
         " ",
         text,
         flags=re.IGNORECASE,
     )
+    # step 5: remove URLs and emojis
     text = re.sub(
         r"\b(?:https?://|www\.)\S+",
         " ",
@@ -99,6 +87,7 @@ def clean_narrative_text(value):
         flags=re.IGNORECASE,
     )
     text = _EMOJI_RE.sub("", text)
+    # step 6: remove promotional references, including the SKU and promo code
     text = re.sub(
         (
             r"(?<![\w-])Reference:\s*"
@@ -110,14 +99,16 @@ def clean_narrative_text(value):
         text,
         flags=re.IGNORECASE,
     )
+    # step 7: remove promotional references, including the promo code
     text = re.sub(
         r"(?<![\w-])PROMO:\s*(?a:B[1-5]SAVE-[0-9]{2})(?![\w-])",
         " ",
         text,
         flags=re.IGNORECASE,
     )
+    # step 8: remove extra whitespace and convert to lowercase
     text = re.sub(r"\s+", " ", text).strip().lower()
-
+    # step 9: return the cleaned text or the literal NaN string
     return text if text else _LITERAL_NAN
 
 
@@ -128,30 +119,13 @@ def extract_order_reference(value):
 
 
 def extract_product_sku(value):
-    """Extract a product SKU from raw narrative (Task 3, Step 2; Xingao).
-
-    Input: None or a raw string already obtained with a JSON/XML parser.
-    Output: the first valid SKU in upper case, or the literal string 'NaN'.
-    Format: SKU- followed by one or more ASCII letters/digits, with boundaries
-    that reject longer malformed or embedded near-matches.
-
-    Call before narrative cleaning (Steps 3-9), which removes the reference
-    wrapper. This function does not check catalogue membership; Task 4 does.
-    """
+    """Accept None or a string; return the upper-case SKU or 'NaN'."""
 
     return _extract_upper(value, _PRODUCT_SKU_RE)
 
 
 def extract_promo_code(value):
-    """Extract a promotion code from raw narrative (Task 3, Step 2; Xingao).
-
-    Input: None or a raw string already obtained with a JSON/XML parser.
-    Output: the first valid code in upper case, or the literal string 'NaN'.
-    Format: B1SAVE- through B5SAVE- followed by exactly two ASCII digits.
-
-    Extract from the raw customer note before cleaning removes PROMO: and its
-    code. Extraction neither changes coupon_discount nor recalculates totals.
-    """
+    """Accept None or a string; return the upper-case code or 'NaN'."""
 
     return _extract_upper(value, _PROMO_CODE_RE)
 
